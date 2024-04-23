@@ -38,13 +38,23 @@ install_requirements() {
 # Download custom python WHL files and package as ZIP if requirements.txt is present
 package_requirements() {
     # Download custom python WHL files and package as ZIP if requirements.txt is present
-    if [[ -e "$AIRFLOW_HOME/$REQUIREMENTS_FILE" ]]; then
+    local reqs="$AIRFLOW_HOME/$REQUIREMENTS_FILE"
+    if [[ -e "$reqs" ]]; then
+        echo "Prepping requirements.txt"
+        grep -v "find-links\|no-index" "$reqs" > "$reqs.tmp"
+        printf '%s\n%s\n' "--constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.7.2/constraints-3.11.txt" "$(cat $reqs.tmp)" > "$reqs.tmp"
+        printf '%s\n%s\n' "--extra-index-url https://artifactory.moveaws.com/artifactory/api/pypi/InnerOpenSource-shared-pypi-local/simple" "$(cat $reqs.tmp)" > "$reqs.tmp"
+        printf '%s\n%s\n' "pynacl @ https://files.pythonhosted.org/packages/66/28/ca86676b69bf9f90e710571b67450508484388bfce09acf8a46f0b8c785f/PyNaCl-1.5.0-cp36-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl" "$(cat $reqs.tmp)" > "$reqs.tmp"
+        echo "Clearing out old plugins"
+        rm "$AIRFLOW_HOME/requirements/plugins.zip"
         echo "Packaging requirements.txt into plugins"
-        pip3 download -r "$AIRFLOW_HOME/$REQUIREMENTS_FILE" -d "$AIRFLOW_HOME/plugins"
+        pip3 download -r "$reqs.tmp" -d "$AIRFLOW_HOME/plugins"
+        rm "$reqs.tmp"
         cd "$AIRFLOW_HOME/plugins"
         zip "$AIRFLOW_HOME/requirements/plugins.zip" *
-        printf '%s\n%s\n' "--no-index" "$(cat $AIRFLOW_HOME/$REQUIREMENTS_FILE)" > "$AIRFLOW_HOME/requirements/packaged_requirements.txt"
-        printf '%s\n%s\n' "--find-links /usr/local/airflow/plugins" "$(cat $AIRFLOW_HOME/requirements/packaged_requirements.txt)" > "$AIRFLOW_HOME/requirements/packaged_requirements.txt"
+        echo "Cleanup"
+        rm $AIRFLOW_HOME/plugins/*.whl
+        rm $AIRFLOW_HOME/plugins/*.tar.gz
     fi
 }
 
